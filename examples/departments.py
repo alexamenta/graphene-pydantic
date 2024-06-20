@@ -10,9 +10,13 @@ import graphene
 from graphene_pydantic import PydanticObjectType, PydanticInterfaceType
 
 
-class PersonModel(pydantic.BaseModel):
+class HasIdentityModel(pydantic.BaseModel):
     id: uuid.UUID
     name: str
+
+
+class PersonModel(HasIdentityModel):
+    pass
 
 
 class SalaryModel(pydantic.BaseModel):
@@ -29,9 +33,7 @@ class ManagerModel(EmployeeModel):
     team_size: int
 
 
-class DepartmentModel(pydantic.BaseModel):
-    id: uuid.UUID
-    name: str
+class DepartmentModel(HasIdentityModel):
     # This will not work properly in Python 3.6. Since
     # ManagerModel is a subclass of EmployeeModel, 3.6's
     # typing implementation throws away the ManagerModel
@@ -39,15 +41,13 @@ class DepartmentModel(pydantic.BaseModel):
     employees: T.List[T.Union[ManagerModel, EmployeeModel]]
 
 
-class NamedModel(pydantic.BaseModel):
-    name: str
 
 
 # Graphene mappings to the above models...
 
-class Named(PydanticInterfaceType):
+class HasIdentity(PydanticInterfaceType):
     class Meta:
-        model = NamedModel
+        model = HasIdentityModel
 
 
 class Salary(PydanticObjectType):
@@ -58,7 +58,7 @@ class Salary(PydanticObjectType):
 class Employee(PydanticObjectType):
     class Meta:
         model = EmployeeModel
-        interfaces = (Named, )
+        interfaces = (HasIdentity, )
 
     # NOTE: This is necessary for the GraphQL Union to be resolved correctly,
     # where DepartmentModel has a list of Managers / Employees
@@ -70,7 +70,7 @@ class Employee(PydanticObjectType):
 class Manager(PydanticObjectType):
     class Meta:
         model = ManagerModel
-        interfaces = (Named, )
+        interfaces = (HasIdentity, )
 
     # NOTE: This is necessary for the GraphQL Union to be resolved correctly
     # where DepartmentModel has a list of Managers / Employees
@@ -82,12 +82,12 @@ class Manager(PydanticObjectType):
 class Department(PydanticObjectType):
     class Meta:
         model = DepartmentModel
-        interfaces = (Named, )
+        interfaces = (HasIdentity, )
 
 
 class Query(graphene.ObjectType):
     list_departments = graphene.List(Department)
-    list_named_entities = graphene.List(Named)
+    list_identities = graphene.List(HasIdentity)
 
     def resolve_list_departments(self, info):
         """Dummy resolver that creates a tree of Pydantic objects"""
@@ -113,7 +113,7 @@ class Query(graphene.ObjectType):
             )
         ]
     
-    def resolve_list_named_entities(self, info):
+    def resolve_list_identities(self, info):
         """Dummy resolver that creates a tree of Pydantic objects with names."""
         employee_list = [
             ManagerModel(
@@ -173,7 +173,8 @@ def main_alt():
     schema = graphene.Schema(query=Query)
     query = """
         query {
-            listNamedEntities {
+            listIdentities {
+                id
                 name
         }
     }

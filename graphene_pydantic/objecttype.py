@@ -79,6 +79,11 @@ class PydanticObjectType(graphene.ObjectType):
             registry, (Registry, None.__class__)
         ), f'The attribute registry in {cls.__name__} needs to be an instance of Registry, received "{registry}".'
 
+        for interface in interfaces:
+            assert issubclass(
+                model, interface._meta.model
+            ), f"The Pydantic model {model.__name__} must be a subclass of interface model {interface._meta.model.__name__}"
+
         if only_fields and exclude_fields:
             raise ValueError(
                 "The options 'only_fields' and 'exclude_fields' cannot be both set on the same type."
@@ -114,13 +119,6 @@ class PydanticObjectType(graphene.ObjectType):
             _meta.fields = pydantic_fields
 
         _meta.id = id or "id"
-
-        # TODO: We don't currently do anything with interfaces, and it would
-        # be great to handle them as well. Some options include:
-        # - throwing an error if they're present, because we _can't_ handle them
-        # - finding a model class with that name and generating an interface
-        #   from it
-        # - using the nearest common ancestor of multiple types in a Union
 
         super().__init_subclass_with_meta__(
             _meta=_meta, interfaces=interfaces, **options

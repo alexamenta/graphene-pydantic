@@ -57,7 +57,7 @@ class Registry(Generic[T]):
         self, model: ModelType
     ) -> Union[Type[BaseType], Placeholder]:
         return self._registry.get(model)
-
+    
     def add_placeholder_for_model(self, model: ModelType):
         if model in self._registry:
             return

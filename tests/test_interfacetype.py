@@ -34,6 +34,35 @@ def test_interface_type():
     assert list(Foo1Obj._meta.fields.keys()) == ["name", "size", "bar"]
     assert list(Foo2Obj._meta.fields.keys()) == ["name", "size", "baz"]
 
+def test_interface_type_check_subclass():
+    class InterfaceModel(BaseModel):
+        name: str
+        size: int
+
+    class InterfaceObj(PydanticInterfaceType):
+        class Meta:
+            model = InterfaceModel
+
+    class Foo(BaseModel):
+        # satisfies the InterfaceModel interface but is not a subclass
+        name: str
+        size: int
+        bar: list[int]
+
+    with pytest.raises(AssertionError) as excinfo:
+        class FooObj(PydanticObjectType):
+            class Meta:
+                model = Foo
+                interfaces = (InterfaceObj,)
+
+    assert "Foo" in str(excinfo)
+    assert "must be a subclass" in str(excinfo)
+    assert "InterfaceModel" in str(excinfo)
+
+
+    # should have an error
+
+
 
 # def test_object_type_excludefields():
 #     class Foo(BaseModel):

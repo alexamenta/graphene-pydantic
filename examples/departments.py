@@ -7,7 +7,7 @@ import decimal
 import pydantic
 import graphene
 
-from graphene_pydantic import PydanticObjectType
+from graphene_pydantic import PydanticObjectType, PydanticInterfaceType
 
 
 class PersonModel(pydantic.BaseModel):
@@ -39,7 +39,15 @@ class DepartmentModel(pydantic.BaseModel):
     employees: T.List[T.Union[ManagerModel, EmployeeModel]]
 
 
+class NamedModel(pydantic.BaseModel):
+    name: str
+
+
 # Graphene mappings to the above models...
+
+class Named(PydanticInterfaceType):
+    class Meta:
+        model = NamedModel
 
 
 class Salary(PydanticObjectType):
@@ -50,6 +58,7 @@ class Salary(PydanticObjectType):
 class Employee(PydanticObjectType):
     class Meta:
         model = EmployeeModel
+        interfaces = (Named, )
 
     # NOTE: This is necessary for the GraphQL Union to be resolved correctly,
     # where DepartmentModel has a list of Managers / Employees
@@ -61,6 +70,7 @@ class Employee(PydanticObjectType):
 class Manager(PydanticObjectType):
     class Meta:
         model = ManagerModel
+        interfaces = (Named, )
 
     # NOTE: This is necessary for the GraphQL Union to be resolved correctly
     # where DepartmentModel has a list of Managers / Employees
@@ -72,10 +82,12 @@ class Manager(PydanticObjectType):
 class Department(PydanticObjectType):
     class Meta:
         model = DepartmentModel
+        interfaces = (Named, )
 
 
 class Query(graphene.ObjectType):
     list_departments = graphene.List(Department)
+    list_named_entities = graphene.List(Named)
 
     def resolve_list_departments(self, info):
         """Dummy resolver that creates a tree of Pydantic objects"""
@@ -100,6 +112,33 @@ class Query(graphene.ObjectType):
                 ],
             )
         ]
+    
+    def resolve_list_named_entities(self, info):
+        """Dummy resolver that creates a tree of Pydantic objects with names."""
+        employee_list = [
+            ManagerModel(
+                id=uuid.uuid4(),
+                name="Jason",
+                salary=SalaryModel(rating="GS-11", amount=95000),
+                team_size=2,
+            ),
+            EmployeeModel(
+                id=uuid.uuid4(),
+                name="Carmen",
+                salary=SalaryModel(rating="GS-9", amount=75000.23),
+                hired_on=datetime.datetime(2019, 1, 1, 15, 26),
+            ),
+            EmployeeModel(id=uuid.uuid4(), name="Derek", salary=None),
+        ]
+        result = [
+            DepartmentModel(
+                id=uuid.uuid4(),
+                name="Administration",
+                employees=employee_list
+            ),
+            *employee_list
+        ]
+        return result 
 
 
 def main():
@@ -130,8 +169,19 @@ def main():
     """
     return schema.execute(query)
 
+def main_alt():
+    schema = graphene.Schema(query=Query)
+    query = """
+        query {
+            listNamedEntities {
+                name
+        }
+    }
+    """
+    return schema.execute(query)
+
 
 if __name__ == "__main__":
-    result = main()
+    result = main_alt()
     print(result.errors)
     print(json.dumps(result.data, indent=2))
